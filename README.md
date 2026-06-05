@@ -1,60 +1,75 @@
 # ternary-fire
 
-**Forest fire model on ternary grids. Burning, empty, and growing.**
+**Forest fire dynamics on a ternary grid. Sparks catch, fires spread, forests regrow, and the cycle never stops.**
 
-The forest fire model is one of the simplest examples of *self-organized criticality*. Trees grow (+1), lightning ignites them (-1), they burn to ash (0), and new trees grow again. No central control. No tuning. The system naturally finds a critical state where huge conflagrations are rare but possible — following a power law.
+A forest fire is a chain reaction: a single spark ignites a tree, the burning tree ignites its neighbors, the fire spreads until there's nothing left to burn, and then — slowly — the forest grows back. This cycle (growth → ignition → spread → burnout → growth) is one of the fundamental rhythms of natural systems.
 
-This crate implements the classic Drossel-Schwabl forest fire on a ternary grid: `+1 = tree`, `0 = empty`, `-1 = burning`. One step, one rule, endless emergent behavior.
+This crate implements the Drossel-Schwabl forest fire model on a ternary grid. Three states: `+1 = living tree`, `0 = empty (burned or never grown)`, `-1 = burning`. At each tick, empty cells might grow a tree (probability p), trees next to fires catch fire, and burning cells become empty. The result is self-organized criticality — just like the sandpile, but with a biological clock.
 
 ## What's Inside
 
-- **`new_grid(width, height, tree_density)`** — initialize a forest with given tree density
-- **`step(grid, ignitions, spread_prob, growth_prob, width, height)`** — one tick: burn trees, spread fire, grow new trees
-- **`count_states(grid)`** — how many burning, empty, tree cells
-- **`burn_fraction(grid)`** — what fraction is on fire
-- **`tree_fraction(grid)`** — forest coverage
-- **`simulate(width, height, density, spread, growth, ticks)`** — full simulation, returns history of state counts
+- **`FireGrid`** — ternary grid with states: `Tree (1)`, `Empty (0)`, `Burning (-1)`
+- **`new(width, height, growth_prob, ignition_prob)`** — configure the fire model
+- **`tick()`** — one generation: grow trees, spread fire, burn out
+- **`plant(x, y)`** — manually plant a tree
+- **`ignite(x, y)`** — set a tree on fire
+- **`count(state)`** — how many cells in each state?
+- **`burn_history()`** — record of how many cells burned each tick (the fire cycle)
 
 ## Quick Example
 
 ```rust
 use ternary_fire::*;
 
-// Start with 60% tree coverage on a 50x50 grid
-let mut grid = new_grid(50, 50, 0.6);
+let mut grid = FireGrid::new(30, 30, 0.05, 0.001);
+// 5% chance of tree growth per empty cell per tick
+// 0.1% chance of spontaneous ignition per tree per tick
 
-// Lightning strikes at (25, 25)
-let ignitions = vec![(25, 25)];
+// Start with a dense forest
+for y in 0..30 {
+    for x in 0..30 {
+        grid.plant(x, y);
+    }
+}
 
-// Run one step: fire spreads with 30% probability, trees grow with 1% probability
-grid = step(&grid, &ignitions, 0.3, 0.01, 50, 50);
+// Drop a match
+grid.ignite(15, 15);
 
-let (burning, empty, trees) = count_states(&grid);
-println!("Burning: {}, Empty: {}, Trees: {}", burning, empty, trees);
-
-// Full simulation: 500 ticks
-let history = simulate(50, 50, 0.6, 0.3, 0.01, 500);
-// Each entry: (tick, burning_count, empty_count, tree_count)
-// Look for power-law distribution of fire sizes
+// Watch it burn
+for _ in 0..50 {
+    grid.tick();
+    let c = grid.count();
+    println!("Trees: {}, Burning: {}, Empty: {}", c.trees, c.burning, c.empty);
+}
+// Fire spreads outward from center, burns everything, leaves emptiness
+// Then slowly: trees regrow from the edges
 ```
 
-## The Insight
+## The Deeper Truth
 
-**Criticality emerges for free.** You don't need to tune the forest fire model to get interesting behavior — it self-organizes. The ratio of growth rate to spread rate determines whether you get frequent small fires or rare catastrophic ones. In ternary agent systems, this maps directly to the question: how resilient is the population to cascading failures?
+**Fire is percolation with a clock.** Ternary percolation asks "can the +1 cells connect?" Fire asks "do the +1 cells connect *fast enough* to sustain a blaze?" The growth probability sets how dense the forest gets before the next fire. The ignition probability sets how often fires start. The ratio between them determines the fire regime:
+
+- High growth, rare ignition → dense forests, catastrophic megafires
+- Low growth, frequent ignition → sparse scrubland, small fires
+- The sweet spot → patchy forests with regular, moderate fires
+
+The Drossel-Schwabl model is another example of self-organized criticality (like the sandpile), but with a *memory* — the time since the last fire determines the current fuel load. The fire cycle is a natural rhythm: growth, accumulation, conflagration, reset. The ternary mapping is perfect: trees are +1 (building energy), empty is 0 (waiting), fire is -1 (releasing energy).
 
 **Use cases:**
-- **Self-organized criticality research** — the simplest SOC model
-- **Epidemiology** — SIR model on a grid (Susceptible=tree, Infected=burning, Recovered=empty)
-- **Risk analysis** — cascade failure modeling in infrastructure networks
-- **Opinion dynamics** — spread of ideas through a population (contagion model)
-- **Teaching** — the most accessible example of emergence
+- **Ecological modeling** — forest fire dynamics and fire regime analysis
+- **Risk assessment** — how does fuel load affect fire severity?
+- **Generative art** — fire patterns create dramatic visual textures
+- **Game design** — fire spreading mechanics for strategy games
+- **Education** — the simplest model of a self-organizing natural cycle
 
 ## See Also
 
-- **ternary-sandpile** — another self-organized critical system on ternary grids
-- **ternary-percolation** — when does fire spread become percolation?
-- **ternary-cascade** — (related) avalanche dynamics
-- **ternary-cell** — large-scale fire simulations
+- **ternary-sandpile** — another SOC model (mechanical, not biological)
+- **ternary-life** — Life is growth without fire
+- **ternary-percolation** — fire is percolation with dynamics
+- **ternary-irradiate** — radiation cascades (fire with inverse-square falloff)
+- **ternary-morph** — morphological analysis of fire scars
+- **ternary-color** — visualize fire with warm/cool palettes
 
 ## Install
 
