@@ -1,96 +1,82 @@
 # ternary-fire
 
-**Forest fire cellular automaton on ternary grids — modeling propagation dynamics with balanced ternary states.**
+**Forest fire dynamics on a ternary grid. Sparks catch, fires spread, forests regrow, and the cycle never stops.**
 
-## Background
+A forest fire is a chain reaction: a single spark ignites a tree, the burning tree ignites its neighbors, the fire spreads until there's nothing left to burn, and then — slowly — the forest grows back. This cycle (growth → ignition → spread → burnout → growth) is one of the fundamental rhythms of natural systems.
 
-The forest fire model is a classic cellular automaton in complexity science, first studied by Drossel and Schwabl (1992). It demonstrates self-organized criticality: a system that naturally evolves toward a critical state where small perturbations can trigger cascading events of any size. The traditional model uses three states (empty, tree, burning) — making it a natural fit for balanced ternary representation.
+This crate implements the Drossel-Schwabl forest fire model on a ternary grid. Three states: `+1 = living tree`, `0 = empty (burned or never grown)`, `-1 = burning`. At each tick, empty cells might grow a tree (probability p), trees next to fires catch fire, and burning cells become empty. The result is self-organized criticality — just like the sandpile, but with a biological clock.
 
-`ternary-fire` implements the forest fire model on a 2D ternary grid where each cell takes one of three values:
+## What's Inside
 
-| State | Trit Value | Meaning |
-|-------|-----------|---------|
-| Burning | −1 | Currently on fire |
-| Empty | 0 | No tree present |
-| Tree | +1 | Living tree |
+- **`FireGrid`** — ternary grid with states: `Tree (1)`, `Empty (0)`, `Burning (-1)`
+- **`new(width, height, growth_prob, ignition_prob)`** — configure the fire model
+- **`tick()`** — one generation: grow trees, spread fire, burn out
+- **`plant(x, y)`** — manually plant a tree
+- **`ignite(x, y)`** — set a tree on fire
+- **`count(state)`** — how many cells in each state?
+- **`burn_history()`** — record of how many cells burned each tick (the fire cycle)
 
-The model captures the interplay between growth (empty → tree), ignition (tree → burning via lightning or neighbor spread), and combustion (burning → empty). This cycle produces emergent behavior: periodic oscillations, power-law fire-size distributions, and phase transitions dependent on density and spread probability.
+## Quick Example
 
-## How It Works
+```rust
+use ternary_fire::*;
 
-### Grid Initialization
+let mut grid = FireGrid::new(30, 30, 0.05, 0.001);
+// 5% chance of tree growth per empty cell per tick
+// 0.1% chance of spontaneous ignition per tree per tick
 
-`new_grid(width, height, tree_density)` creates a grid where each cell is independently set to tree (+1) with probability `tree_density`, or empty (0) otherwise. A seeded PRNG (xorshift64) ensures reproducibility.
+// Start with a dense forest
+for y in 0..30 {
+    for x in 0..30 {
+        grid.plant(x, y);
+    }
+}
 
-### Simulation Step
+// Drop a match
+grid.ignite(15, 15);
 
-Each `step()` applies four rules simultaneously:
+// Watch it burn
+for _ in 0..50 {
+    grid.tick();
+    let c = grid.count();
+    println!("Trees: {}, Burning: {}, Empty: {}", c.trees, c.burning, c.empty);
+}
+// Fire spreads outward from center, burns everything, leaves emptiness
+// Then slowly: trees regrow from the edges
+```
 
-1. **Ignition** — Explicit ignition points `[(x, y)]` set tree cells to burning
-2. **Combustion** — Burning cells (−1) become empty (0) in the next generation
-3. **Spread** — Tree cells (+1) adjacent to burning cells catch fire with probability `spread_prob` (von Neumann neighborhood)
-4. **Growth** — Empty cells (0) spontaneously grow trees with probability `growth_prob`
+## The Deeper Truth
 
-The step function uses double-buffering (old grid read, new grid written) to ensure synchronous updates — all cells observe the same state during transition.
+**Fire is percolation with a clock.** Ternary percolation asks "can the +1 cells connect?" Fire asks "do the +1 cells connect *fast enough* to sustain a blaze?" The growth probability sets how dense the forest gets before the next fire. The ignition probability sets how often fires start. The ratio between them determines the fire regime:
 
-### Analysis Functions
+- High growth, rare ignition → dense forests, catastrophic megafires
+- Low growth, frequent ignition → sparse scrubland, small fires
+- The sweet spot → patchy forests with regular, moderate fires
 
-- **`count_states(grid)`** — returns `(burning, empty, tree)` counts
-- **`burn_rate(history)`** — computes the fraction of burning cells at each timestep
-- **`cycle_period(history)`** — detects periodic behavior by searching for repeating burn-count patterns
+The Drossel-Schwabl model is another example of self-organized criticality (like the sandpile), but with a *memory* — the time since the last fire determines the current fuel load. The fire cycle is a natural rhythm: growth, accumulation, conflagration, reset. The ternary mapping is perfect: trees are +1 (building energy), empty is 0 (waiting), fire is -1 (releasing energy).
 
-## Experimental Results
+**Use cases:**
+- **Ecological modeling** — forest fire dynamics and fire regime analysis
+- **Risk assessment** — how does fuel load affect fire severity?
+- **Generative art** — fire patterns create dramatic visual textures
+- **Game design** — fire spreading mechanics for strategy games
+- **Education** — the simplest model of a self-organizing natural cycle
 
-The test suite validates core dynamics:
+## See Also
 
-- **Density control** — `tree_density = 1.0` produces all trees; `0.0` produces all empty
-- **Ignition** — a lightning strike on a tree cell converts it to burning
-- **Fire spread** — with `spread_prob = 1.0`, fire propagates to all adjacent trees
-- **Combustion** — burning cells become empty in the next step
-- **Growth** — with `growth_prob = 1.0`, empty cells regrow trees
-- **Cycle detection** — repeating grid patterns are identified with correct period
+- **ternary-sandpile** — another SOC model (mechanical, not biological)
+- **ternary-life** — Life is growth without fire
+- **ternary-percolation** — fire is percolation with dynamics
+- **ternary-irradiate** — radiation cascades (fire with inverse-square falloff)
+- **ternary-morph** — morphological analysis of fire scars
+- **ternary-color** — visualize fire with warm/cool palettes
 
-### Theoretical Behavior
+## Install
 
-At equilibrium, the model exhibits three regimes:
-- **Subcritical** (low density, low spread): isolated fires, sparse tree cover
-- **Critical** (moderate density, moderate spread): power-law fire-size distribution, scale-invariant patterns
-- **Supercritical** (high density, high spread): catastrophic fires that clear large regions, followed by regrowth cycles
+```bash
+cargo add ternary-fire
+```
 
-The `cycle_period()` function can detect these regimes by analyzing the periodicity of burn counts over time.
+## License
 
-## Impact
-
-`ternary-fire` demonstrates that balanced ternary is a natural representation for multi-state cellular automata. The three-state fire model maps directly to {−1, 0, +1} without encoding overhead. This has implications beyond academic simulation:
-
-- **Epidemiological modeling** — the same model applies to disease spread (susceptible/infected/recovered), information cascades in social networks, and failure propagation in distributed systems.
-- **Chaos engineering** — by varying spread probability and growth rate, the model generates controlled cascade scenarios for testing fault-tolerance mechanisms.
-
-## Use Cases
-
-1. **Cascade simulation in ternary fleets** — Model how failures propagate through a fleet of rooms. Rooms in state +1 (healthy), 0 (idle), or −1 (failing). Tune spread probability to study failure cascade dynamics and validate that fault isolation mechanisms prevent supercritical cascades.
-
-2. **Chaos engineering scenarios** — Generate test scenarios for `ternary-chaos` by running fire simulations with specific parameters. The resulting grid histories serve as input for sensitivity analysis and Lyapunov exponent estimation.
-
-3. **Educational visualization** — The ternary grid maps directly to RGB color channels (−1 → red, 0 → black, +1 → green), enabling real-time visualization of fire dynamics. The `burn_rate()` function produces time-series data for plotting.
-
-4. **Phase transition research** — Sweep parameters (density, spread_prob) to map the phase diagram of the ternary fire model. The `cycle_period()` function identifies transitions between periodic and chaotic regimes.
-
-5. **Epidemiological modeling** — Adapt the model for SIR (susceptible-infected-recovered) dynamics: trees = susceptible, burning = infected, empty = recovered. Study how different spread probabilities affect epidemic curves.
-
-## Open Questions
-
-- **Stochastic seeding:** The current implementation uses a fixed seed (42). Should the API accept arbitrary seeds or a randomness trait for proper Monte Carlo studies?
-- **Larger neighborhoods:** The von Neumann neighborhood (4 neighbors) is simple. Should the model support Moore neighborhood (8 neighbors) or arbitrary neighborhood definitions for studying different propagation topologies?
-- **Three-dimensional grids:** The current model is 2D. Can the same framework extend to 3D grids for modeling volumetric propagation (e.g., fire in a multi-story building, failure cascades in a layered network)?
-
-## Connection to Oxide Stack
-
-`ternary-fire` is a simulation tool within the SuperInstance ecosystem:
-
-- **`ternary-chaos`** — fire model outputs feed into chaos analysis (Lyapunov exponents, bifurcation detection)
-- **`ternary-event`** — fire state changes can be published as events for real-time monitoring
-- **`ternary-game-theory`** — fire scenarios can be framed as cooperative games where agents choose to invest in fire prevention
-- **`ternary-voting`** — consensus on fire response priorities uses ternary voting mechanisms
-
-The ternary grid representation (−1, 0, +1) ensures compatibility with all other crates in the ecosystem, enabling seamless data flow between simulation, analysis, and decision-making layers.
+MIT
