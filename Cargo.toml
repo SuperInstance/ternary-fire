@@ -1,4 +1,6 @@
 [package]
+description = "ternary-fire - SuperInstance ecosystem crate"
+repository = "https://github.com/SuperInstance/ternary-fire"
 name = "ternary-fire"
 version = "0.1.0"
 edition = "2021"
